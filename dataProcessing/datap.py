@@ -29,18 +29,19 @@ def get_pcap_df(pcap_file):
         csi_matrix_squeezd[x] = hampel(csi_matrix_squeezd[x], 10, 3)
         csi_matrix_squeezd[x] = running_mean(csi_matrix_squeezd[x], 10)
 
-    # null_subcarriers = [-64, -63, -62, -61, -60, -59, -1, 0, 1, 59, 60, 61, 62, 63]
-    # pilot_subcarriers = [11, 25, 53, -11, -25, -53]
-    # removed_subcarriers = null_subcarriers + pilot_subcarriers
-    # removed_subcarriers.sort(reverse=True)
+    null_subcarriers = [-64, -63, -62, -61, -60, -59, -1, 0, 1, 59, 60, 61, 62, 63]
+    pilot_subcarriers = [11, 25, 53, -11, -25, -53]
+    removed_subcarriers = null_subcarriers + pilot_subcarriers
+    removed_subcarriers.sort(reverse=True)
 
-    # for i in removed_subcarriers:
-    #     csi_matrix_squeezd = np.delete(csi_matrix_squeezd, i + 64, 1)
+    for i in removed_subcarriers:
+        csi_matrix_squeezd = np.delete(csi_matrix_squeezd, i + 64, 1)
 
-    # # get the average value of the subcarriers
-    # df_csi = pd.DataFrame(csi_matrix_squeezd.mean(axis=1), columns=['csi'])
-    # 13th sub carrier
-    df_csi = pd.DataFrame(csi_matrix_squeezd[:, 13 + 64], columns=['csi'])
+    # get the average value of the subcarriers
+    df_csi = pd.DataFrame(csi_matrix_squeezd.mean(axis=1), columns=['csi'])
+
+    # # 13th sub carrier
+    # df_csi = pd.DataFrame(csi_matrix_squeezd[:, 13 + 64], columns=['csi'])
     return df_csi
 
 def combine_pcap(path_to_dir, file_prefix, file_suffix):
@@ -106,31 +107,22 @@ def train_ml(df_combined, model=None):
     model.fit(x_train, y_train)
     y_pred = model.predict(x_test)
     # kfold training
-    k = 5
     kf = KFold(n_splits=5, shuffle=True, random_state=0)
 
     # Perform K-Fold Cross-Validation
-    mse_list = []
-
     for train_index, test_index in kf.split(df_combined):
         # Split data
         X_train, X_test = df_combined[['temp']].iloc[train_index], df_combined[['temp']].iloc[test_index]
-        y_train, y_test = df_combined['csi'].iloc[train_index], df_combined['csi'].iloc[test_index]
+        Y_train, Y_test = df_combined['csi'].iloc[train_index], df_combined['csi'].iloc[test_index]
 
         # Train the model
-        model.fit(X_train, y_train)
+        model.fit(X_train, Y_train)
 
-        # Make predictions
-        y_pred = model.predict(X_test)
+    return (x_test, y_test, model)
 
-        # Evaluate the model
-        mse = mean_squared_error(y_test, y_pred)
-        mse_list.append(mse)
-        return (x_test, y_pred, model)
-
-def graph_ml(df_combined, x_test, y_pred, model):
+def graph_ml(x_test, y_test, model):
     # machine learning graphing
-    plt.scatter(df_combined['temp'], df_combined['csi'], color='blue')
+    plt.scatter(x_test, y_test, color='blue')
     y_pred = model.predict(x_test)
     plt.scatter(x_test, y_pred, color='red')
     plt.legend()
@@ -144,41 +136,35 @@ def get_regression(df_combined):
     plt.scatter(df_combined['csi'], df_combined['temp'])
     plt.plot(polyline, model(polyline))
     plt.show()
- 
-def train_with_all_files(path_to_dir, prefix=None):
-    graph_df_temp = get_temp_df(path_to_dir + '/' + 'heated_0-7.csv')
-    graph_df_csi = get_df_csv(path_to_dir + '/' + 'heated_0-7z_csi_13.csv', ['csi'])
-    # files = []
-    # with os.scandir(path_to_dir) as entries:
-    #     for entry in entries:
-    #         if entry.name.endswith('.csv') or entry.name.endswith('pcap'):
-    #             if prefix != None: 
-    #                 if (entry.name.startswith('heated')):
-    #                     files.append(entry.name)
-    #             else:
-    #                 files.append(entry.name)
-    # files.sort()
-    # new_files = []
-    # grouped_files = []
-    # for i in range(len(files)):
-    #     if (i % 2):
-    #         new_files.append(files[i])
-    #         grouped_files.append(new_files)
-    #     else:
-    #         new_files = [files[i]]
-    # df_combines = []
-    # for i in grouped_files:
-    #     df_csi, df_temp = csvs_from_csi_temp(path_to_dir, i[1], i[0])
-    #     df_combines.append(combine_average_df(df_csi, df_temp))
-    # x_test, y_pred, model = (None, None, None)
-    # for i in df_combines:
-    #     x_test, y_pred, model = train_ml(i, model=model) 
-    df_combined = combine_average_df(graph_df_csi, graph_df_temp)
-    x_test, y_pred, model = train_ml(df_combined)
-    # graph_ml(df_combined, graph_df_temp['temp'].to_frame(), graph_df_csi['csi'].to_frame(), model)
-    graph_ml(df_combined, x_test, y_pred, model)
+
+def train_with_all_files(path_to_dir, prefix=''): 
+    files = []
+    with os.scandir(path_to_dir) as entries:
+        for entry in entries:
+            if entry.name.endswith('.csv') or entry.name.endswith('pcap'):
+                if (entry.name.startswith(prefix)):
+                    print('test', entry.name)
+                    files.append(entry.name)
+    files.sort()
+    new_files = []
+    grouped_files = []
+    for i in range(len(files)):
+        if (i % 2):
+            new_files.append(files[i])
+            grouped_files.append(new_files)
+        else:
+            new_files = [files[i]]
+    df_combines = []
+    for i in grouped_files:
+        df_csi, df_temp = csvs_from_csi_temp(path_to_dir, i[1], i[0])
+        df_combines.append(combine_average_df(df_csi, df_temp))
+    new_df = pd.DataFrame()
+    for i in df_combines:
+        new_df = pd.concat([new_df, i])
+    (x_test, y_test, model) = train_ml(new_df) 
+    graph_ml(x_test, y_test, model)
 
        
 
 if __name__ == "__main__":
-    train_with_all_files('../dataCollection', prefix='heated')
+    train_with_all_files('../dataCollection', prefix='heated_1-7')
