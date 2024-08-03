@@ -70,7 +70,7 @@ def initial_nexmon_setup():
 
 def process_csi_data():
     nexmon_reader = get_reader(outputFile)
-    csi_data = pcap_reader.read_file(nexmon_reader, scaled=False)
+    csi_data = nexmon_reader.read_file(nexmon_reader, scaled=False)
     csi_matrix, no_frames, no_subcarriers = csitools.get_CSI(csi_data, metric="amplitude")
 
     #TODO: NEED TO CONVERT THE ABOVE INTO A LIST OF CSI AMPLITUDE NUMBERS IN ORDER OF PACKETS
