@@ -38,7 +38,9 @@ def send_mqtt_message(csi_amplitude_list):
     # csi_amplitude_list is simply a list of CSI Amplitudes per packet, in order of packet number from the pcap file
     
     payload = {
-        "csi_amplitude_list": csi_amplitude_list
+        "csi_amplitude_list": csi_amplitude_list,
+	"fire_alarm": -1,
+	"temperature_predicted": -1
     }
 
     myClient.publish("test/comp6733", json.dumps(payload), 0)
