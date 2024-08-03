@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import BayesianRidge
-from sklearn.metrics import r2_score
 from sklearn.model_selection import train_test_split
 from CSIKit.reader import get_reader
 from CSIKit.util import csitools
@@ -13,8 +12,10 @@ from CSIKit.filters.passband import lowpass
 from CSIKit.filters.statistical import running_mean
 from CSIKit.util.filters import hampel
 from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error
 from scipy import stats
+import json
+import time
+import AWSIoTPythonSDK.MQTTLib as AWSIoTpyMQTT
 
 
 def get_pcap_df(pcap_file):
@@ -182,16 +183,42 @@ def train_with_all_files(path_to_dir, prefix=""):
     for i in df_combines:
         new_df = pd.concat([new_df, i])
     (x_test, y_test, model) = train_ml(new_df)
-    graph_ml(x_test, y_test, model)
+    # graph_ml(x_test, y_test, model)
     # get_regression(new_df)
     # print(x_test)
     return model
 
+import json
+import AWSIoTPythonSDK.MQTTLib as AWSIoTpyMQTT
+
+#--------------------------------------------------------------------
+# AWS MQTT CONFIGURATION
+#-------------------------------------------------------------------
+
+def callback(client, userdata, message):
+    messageObj = json.loads(message.payload)
+    x = float(messageObj['csi'])
+    d = {"csi": [x]}
+    df = pd.DataFrame(data=d)
+    temp = model.predict(df)
+    message = {
+        'temp': temp
+    }
+    messageJson = json.dumps(message)
+
+    client.publish("test/comp6733", messageJson, 1)
+
 
 if __name__ == "__main__":
     model = train_with_all_files("../dataCollection/28 July/", prefix="long_run_0-7")
-    while True:
-        x = int(input("csi: "))
-        d = {"csi": [x]}
-        df = pd.DataFrame(data=d)
-        print(model.predict(df))
+    # Client configuration with endpoint and credentials
+    myClient = AWSIoTpyMQTT.AWSIoTMQTTClient("iotconsole-ffb21e69-bfb3-46d4-b53e-770684c37161")
+    myClient.configureEndpoint('a9p2nsgtl0l6h-ats.iot.ap-southeast-2.amazonaws.com',8883)
+    myClient.configureCredentials("AmazonRootCA1.pem","f088a7673ecd96e624c3e6e9b83de37442691e15ffbee24fd694ed966832dc94-private.pem.key","f088a7673ecd96e624c3e6e9b83de37442691e15ffbee24fd694ed966832dc94-certificate.pem.crt")
+    myClient.configureAutoReconnectBackoffTime(1, 32, 20)
+    myClient.configureOfflinePublishQueueing(-1)
+    myClient.configureDrainingFrequency(2)
+    myClient.configureConnectDisconnectTimeout(10)
+    myClient.configureMQTTOperationTimeout(5)
+    myClient.connect()
+    myClient.subscribe("test/someendpoint", 0, callback)
