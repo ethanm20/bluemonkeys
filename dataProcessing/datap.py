@@ -61,15 +61,20 @@ pilots = {
     ]]
 }
 
+import interleaved as decoder
 
 def get_pcap_df(pcap_file):
-    my_reader = get_reader(pcap_file)
-    csi_data = my_reader.read_file(pcap_file)
-    csi_matrix, no_frames, no_subcarriers = csitools.get_CSI(
-        csi_data, metric="amplitude"
-    )
-    csi_matrix = csi_matrix[:, :, 0, 0]
-    csi_matrix = np.squeeze(csi_matrix)
+    samples = decoder.read_pcap(pcap_file)
+
+    csi_matrix = np.abs(samples.csi) # Access all CSI samples as a numpy matrix
+    z_scores = np.abs(stats.zscore(csi_matrix, axis=0))
+    threshold = 3
+
+    # Identify rows with any Z-score greater than the threshold
+    outlier_rows = np.any(z_scores > threshold, axis=1)
+
+    # Filter the data to remove rows with outliers
+    csi_matrix = csi_matrix[~outlier_rows]
 
     finite_mask = np.isfinite(csi_matrix).all(axis=1)
     csi_matrix = csi_matrix[finite_mask]
@@ -88,7 +93,7 @@ def get_pcap_df(pcap_file):
     df_csi = pd.DataFrame(csi_matrix.mean(axis=1), columns=['csi'])
 
     # 13th sub carrier
-    # df_csi = pd.DataFrame(csi_matrix[:, 21 - 6], columns=["csi"])
+    # df_csi = pd.DataFrame(csi_matrix[:, 13 + 128], columns=["csi"])
 
     return df_csi
 
@@ -227,7 +232,7 @@ def train_with_all_files(path_to_dir, prefix=""):
     for i in df_combines:
         new_df = pd.concat([new_df, i])
     (x_test, y_test, model) = train_ml(new_df)
-    # graph_ml(x_test, y_test, model)
+    graph_ml(x_test, y_test, model)
     # get_regression(new_df)
     # print(x_test)
     return model
@@ -237,28 +242,29 @@ def train_with_all_files(path_to_dir, prefix=""):
 #-------------------------------------------------------------------
 
 def callback(client, userdata, message):
-    print('received')
-    # if (messageObj['csi_amplitude_list'] == -1):
-    #     return
-    messageObj = json.loads(message.payload)
-    nexmon_reader = get_reader(messageObj['csi'])
-    csi_data = nexmon_reader.read_file(nexmon_reader, scaled=False)
-    csi_matrix, no_frames, no_subcarriers = csitools.get_CSI(csi_data, metric="amplitude")
+    pass
+    # print('received')
+    # # if (messageObj['csi_amplitude_list'] == -1):
+    # #     return
+    # # messageObj = json.loads(message.payload)
+    # # nexmon_reader = get_reader(messageObj['csi'])
+    # # csi_data = nexmon_reader.read_file(nexmon_reader, scaled=False)
+    # # csi_matrix, no_frames, no_subcarriers = csitools.get_CSI(csi_data, metric="amplitude")
 
-    # get rid of all infinities and other stuff yo
-    csi_matrix = csi_matrix[:, :, 0, 0]
-    csi_matrix= np.squeeze(csi_matrix)
-    valid_mask = np.isfinite(csi_matrix) 
-    # Calculate the mean of each column ignoring NaN and infinity
-    csi_amplitude_list = np.array([np.mean(csi_matrix[valid_mask[:, col], col]) for col in range(csi_matrix.shape[1])])
-    removed_subcarriers = []
-    removed_subcarriers.extend(nulls[80])
-    for i in pilots[80]:
-        removed_subcarriers.append(i)
-    removed_subcarriers.sort(reverse=True)
-    for i in csi_amplitude_list:
-        csi_amplitude_list = np.delete(csi_amplitude_list, i, 1)
-    print(csi_amplitude_list)
+    # # get rid of all infinities and other stuff yo
+    # csi_matrix = csi_matrix[:, :, 0, 0]
+    # csi_matrix= np.squeeze(csi_matrix)
+    # valid_mask = np.isfinite(csi_matrix) 
+    # # Calculate the mean of each column ignoring NaN and infinity
+    # csi_amplitude_list = np.array([np.mean(csi_matrix[valid_mask[:, col], col]) for col in range(csi_matrix.shape[1])])
+    # removed_subcarriers = []
+    # removed_subcarriers.extend(nulls[80])
+    # for i in pilots[80]:
+    #     removed_subcarriers.append(i)
+    # removed_subcarriers.sort(reverse=True)
+    # for i in csi_amplitude_list:
+    #     csi_amplitude_list = np.delete(csi_amplitude_list, i, 1)
+    # print(csi_amplitude_list)
 
     # l = float(messageObj['csi_amplitude_list'])
     # new_l = []
