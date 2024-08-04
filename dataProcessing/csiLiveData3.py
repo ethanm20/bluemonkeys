@@ -10,7 +10,7 @@ import time
 hexString = "KuABEQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
 port = 5500
 interfaceName = "wlan0"
-numSamples = 100
+numSamples = 50
 
 outputFile = "outputCSILive.pcap"
 
@@ -40,7 +40,7 @@ def send_mqtt_message(csi_amplitude_list):
 	"temperature_predicted": -1
     }
 
-    myClient.publish("test/comp6733", json.dumps(payload), 0)
+    myClient.publish("test/comp6733", json.dumps(payload), 1)
 
 
 #--------------------------------------------------------------------
@@ -74,7 +74,7 @@ def process_csi_data():
         data = file.read()
         encoded_data = base64.b64encode(data)
         
-    csi_amplitude_list = str(encoded_data)
+    csi_amplitude_list = str(encoded_data.decode("utf-8"))
 
     # Now sending over MQTT
     print("Sending message over MQTT")
