@@ -17,6 +17,50 @@ import json
 import time
 import AWSIoTPythonSDK.MQTTLib as AWSIoTpyMQTT
 
+nulls = {
+    20: [x+32 for x in [
+            -32, -31, -30, -29,
+                31,  30,  29,  0
+        ]],
+
+    40: [x+64 for x in [
+        -64, -63, -62, -61, -60, -59, -1, 
+            63,  62,  61,  60,  59,  1,  0
+    ]],
+
+    80: [x+128 for x in [
+        -128, -127, -126, -125, -124, -123, -1,
+            127,  126,  125,  124,  123,  1,  0
+    ]],
+
+    160: [x+256 for x in [
+        -256, -255, -254, -253, -252, -251, -129, -128, -127, -5, -4, -3, -2, -1,
+            255,  254,  253,  252,  251,  129,  128,  127,  5,  4,  3,  3,  1,  0 
+    ]]
+}
+
+pilots = {
+    20: [x+32 for x in [
+        -21, -7,
+        21,  7
+    ]],
+
+    40: [x+64 for x in [
+        -53, -25, -11, 
+        53,  25,  11
+    ]],
+
+    80: [x+128 for x in [
+        -103, -75, -39, -11,
+        103,  75,  39,  11
+    ]],
+
+    160: [x+256 for x in [
+        -231, -203, -167, -139, -117, -89, -53, -25,
+        231,  203,  167,  139,  117,  89,  53,  25
+    ]]
+}
+
 
 def get_pcap_df(pcap_file):
     my_reader = get_reader(pcap_file)
@@ -24,27 +68,27 @@ def get_pcap_df(pcap_file):
     csi_matrix, no_frames, no_subcarriers = csitools.get_CSI(
         csi_data, metric="amplitude"
     )
-    csi_matrix_first = csi_matrix[:, :, 0, 0]
-    csi_matrix_squeezd = np.squeeze(csi_matrix_first)
-    finite_mask = np.isfinite(csi_matrix_squeezd).all(axis=1)
-    csi_matrix_squeezd = csi_matrix_squeezd[finite_mask]
+    csi_matrix = csi_matrix[:, :, 0, 0]
+    csi_matrix = np.squeeze(csi_matrix)
 
-    for x in range(len(csi_matrix_squeezd)):
-        csi_matrix_squeezd[x] = lowpass(csi_matrix_squeezd[x], 10, 100, 5)
-        csi_matrix_squeezd[x] = hampel(csi_matrix_squeezd[x], 10, 3)
-        csi_matrix_squeezd[x] = running_mean(csi_matrix_squeezd[x], 10)
+    finite_mask = np.isfinite(csi_matrix).all(axis=1)
+    csi_matrix = csi_matrix[finite_mask]
+    for x in range(len(csi_matrix)):
+        csi_matrix[x] = lowpass(csi_matrix[x], 10, 100, 5)
+        csi_matrix[x] = hampel(csi_matrix[x], 10, 3)
+        csi_matrix[x] = running_mean(csi_matrix[x], 10)
+    removed_subcarriers = []
+    removed_subcarriers.extend(nulls[80])
+    for i in pilots[80]:
+        removed_subcarriers.append(i)
+    removed_subcarriers.sort(reverse=True)
+    for i in removed_subcarriers:
+        csi_matrix = np.delete(csi_matrix, i, 1)
 
-    # removed_subcarriers = [125, 126, 127, 128, 129, 130, 131, 249, 250, 251, 252 ,253, 254, 255, 0, 1, 2, 3, 4, 5, 6]
-    # removed_subcarriers.sort(reverse=True)
-
-    # for i in removed_subcarriers:
-    #     csi_matrix_squeezd = np.delete(csi_matrix_squeezd, i, 1)
-
-    # # get the average value of the subcarriers
-    # df_csi = pd.DataFrame(csi_matrix_squeezd.mean(axis=1), columns=['csi'])
+    df_csi = pd.DataFrame(csi_matrix.mean(axis=1), columns=['csi'])
 
     # 13th sub carrier
-    df_csi = pd.DataFrame(csi_matrix_squeezd[:, 100], columns=["csi"])
+    # df_csi = pd.DataFrame(csi_matrix[:, 21 - 6], columns=["csi"])
 
     return df_csi
 
@@ -188,25 +232,56 @@ def train_with_all_files(path_to_dir, prefix=""):
     # print(x_test)
     return model
 
-import json
-import AWSIoTPythonSDK.MQTTLib as AWSIoTpyMQTT
-
 #--------------------------------------------------------------------
 # AWS MQTT CONFIGURATION
 #-------------------------------------------------------------------
 
 def callback(client, userdata, message):
+    print('received')
+    # if (messageObj['csi_amplitude_list'] == -1):
+    #     return
     messageObj = json.loads(message.payload)
-    x = float(messageObj['csi'])
-    d = {"csi": [x]}
-    df = pd.DataFrame(data=d)
-    temp = model.predict(df)
-    message = {
-        'temp': temp
-    }
-    messageJson = json.dumps(message)
+    nexmon_reader = get_reader(messageObj['csi'])
+    csi_data = nexmon_reader.read_file(nexmon_reader, scaled=False)
+    csi_matrix, no_frames, no_subcarriers = csitools.get_CSI(csi_data, metric="amplitude")
 
-    client.publish("test/comp6733", messageJson, 1)
+    # get rid of all infinities and other stuff yo
+    csi_matrix = csi_matrix[:, :, 0, 0]
+    csi_matrix= np.squeeze(csi_matrix)
+    valid_mask = np.isfinite(csi_matrix) 
+    # Calculate the mean of each column ignoring NaN and infinity
+    csi_amplitude_list = np.array([np.mean(csi_matrix[valid_mask[:, col], col]) for col in range(csi_matrix.shape[1])])
+    removed_subcarriers = []
+    removed_subcarriers.extend(nulls[80])
+    for i in pilots[80]:
+        removed_subcarriers.append(i)
+    removed_subcarriers.sort(reverse=True)
+    for i in csi_amplitude_list:
+        csi_amplitude_list = np.delete(csi_amplitude_list, i, 1)
+    print(csi_amplitude_list)
+
+    # l = float(messageObj['csi_amplitude_list'])
+    # new_l = []
+    # for index, v in enumerate(l):
+    #     if (index not in pilots[80] and index not in nulls[80]):
+    #         new_l.append(v)
+    #         print(index)
+    # average_csi = sum(new_l)/len(new_l)
+    # d = {"csi_amplitude_list": [average_csi]}
+    # df = pd.DataFrame(data=d)
+    # predicted_temp = model.predict(df)
+    # if predicted_temp > 30:
+    #     fire_alarm = 1
+    # else:
+    #     fire_alarm = 0
+    # message = {
+    #     'csi_amplitude_list': -1,
+    #     'temperature_predicted': predicted_temp,
+    #     'fire_alarm': fire_alarm
+    # }
+    # messageJson = json.dumps(message)
+    # print('pubished')
+    # client.publish("test/comp6733", messageJson, 1)
 
 
 if __name__ == "__main__":
@@ -221,4 +296,6 @@ if __name__ == "__main__":
     myClient.configureConnectDisconnectTimeout(10)
     myClient.configureMQTTOperationTimeout(5)
     myClient.connect()
-    myClient.subscribe("test/someendpoint", 0, callback)
+    myClient.subscribe("test/comp6733", 0, callback)
+    while True:
+        time.sleep(1)
