@@ -159,8 +159,8 @@ def train_ml(df_combined, model=None):
     x_rf = df_combined[["csi"]]
     y_rf = df_combined["temp"]
     if model == None:
-        model = RandomForestRegressor()
-        # model = LinearRegression()
+        # model = RandomForestRegressor()
+        model = LinearRegression()
     x_train, x_test, y_train, y_test = train_test_split(
         x_rf, y_rf, test_size=0.5, random_state=42
     )
@@ -200,11 +200,14 @@ def graph_ml(x_test, y_test, model):
 
 def get_regression(df_combined):
     # polynomial
-    model = np.poly1d(np.polyfit(df_combined['csi'], df_combined['temp'], 5))
+    model = np.poly1d(np.polyfit(df_combined['csi'], df_combined['temp'], 3))
     polyline = np.linspace(min(df_combined['csi']), max(df_combined['csi']), 1000)
     plt.scatter(df_combined['csi'], df_combined['temp'])
     plt.plot(polyline, model(polyline))
+    plt.xlabel("CSI")
+    plt.ylabel("Temp")
     plt.show()
+    return model
 
 
 def train_with_all_files(path_to_dir, prefix=""):
@@ -232,7 +235,7 @@ def train_with_all_files(path_to_dir, prefix=""):
     for i in df_combines:
         new_df = pd.concat([new_df, i])
     (x_test, y_test, model) = train_ml(new_df)
-    graph_ml(x_test, y_test, model)
+    # graph_ml(x_test, y_test, model)
     # get_regression(new_df)
     # print(x_test)
     return model
@@ -240,68 +243,54 @@ def train_with_all_files(path_to_dir, prefix=""):
 #--------------------------------------------------------------------
 # AWS MQTT CONFIGURATION
 #-------------------------------------------------------------------
-
 def callback(client, userdata, message):
-    pass
-    # print('received')
-    # # if (messageObj['csi_amplitude_list'] == -1):
-    # #     return
-    # # messageObj = json.loads(message.payload)
-    # # nexmon_reader = get_reader(messageObj['csi'])
-    # # csi_data = nexmon_reader.read_file(nexmon_reader, scaled=False)
-    # # csi_matrix, no_frames, no_subcarriers = csitools.get_CSI(csi_data, metric="amplitude")
+    global myClient
+    global model
+    print('received')
+    if (messageObj['csi'] == -1):
+        return
+    messageObj = json.loads(message.payload)
+    csi = float(messageObj['csi'])
+    d = {"csi": [csi]}
+    df = pd.DataFrame(data=d)
+    global model
+    predicted_temp = model.predict(df)
+    if predicted_temp > 30:
+        fire_alarm = 1
+    else:
+        fire_alarm = 0
+    message = {
+        'csi': -1,
+        'temperature_predicted': predicted_temp,
+        'fire_alarm': fire_alarm
+    }
+    messageJson = json.dumps(message)
+    print('pubished')
+    myClient.publish("test/comp6733", messageJson, 1)
 
-    # # get rid of all infinities and other stuff yo
-    # csi_matrix = csi_matrix[:, :, 0, 0]
-    # csi_matrix= np.squeeze(csi_matrix)
-    # valid_mask = np.isfinite(csi_matrix) 
-    # # Calculate the mean of each column ignoring NaN and infinity
-    # csi_amplitude_list = np.array([np.mean(csi_matrix[valid_mask[:, col], col]) for col in range(csi_matrix.shape[1])])
-    # removed_subcarriers = []
-    # removed_subcarriers.extend(nulls[80])
-    # for i in pilots[80]:
-    #     removed_subcarriers.append(i)
-    # removed_subcarriers.sort(reverse=True)
-    # for i in csi_amplitude_list:
-    #     csi_amplitude_list = np.delete(csi_amplitude_list, i, 1)
-    # print(csi_amplitude_list)
-
-    # l = float(messageObj['csi_amplitude_list'])
-    # new_l = []
-    # for index, v in enumerate(l):
-    #     if (index not in pilots[80] and index not in nulls[80]):
-    #         new_l.append(v)
-    #         print(index)
-    # average_csi = sum(new_l)/len(new_l)
-    # d = {"csi_amplitude_list": [average_csi]}
-    # df = pd.DataFrame(data=d)
-    # predicted_temp = model.predict(df)
-    # if predicted_temp > 30:
-    #     fire_alarm = 1
-    # else:
-    #     fire_alarm = 0
-    # message = {
-    #     'csi_amplitude_list': -1,
-    #     'temperature_predicted': predicted_temp,
-    #     'fire_alarm': fire_alarm
-    # }
-    # messageJson = json.dumps(message)
-    # print('pubished')
-    # client.publish("test/comp6733", messageJson, 1)
-
+def print_linear_regression_formula():
+    global model
+    coefficients = model.coef_
+    intercept = model.intercept_
+    terms = [f"{coef:.2f}*x{i+1}" for i, coef in enumerate(coefficients)]
+    formula = " + ".join(terms)
+    print(f"y = {intercept:.2f} + {formula}")
 
 if __name__ == "__main__":
+    global model
+    global myClient
     model = train_with_all_files("../dataCollection/28 July/", prefix="long_run_0-7")
+    print_linear_regression_formula()
     # Client configuration with endpoint and credentials
     myClient = AWSIoTpyMQTT.AWSIoTMQTTClient("iotconsole-ffb21e69-bfb3-46d4-b53e-770684c37161")
     myClient.configureEndpoint('a9p2nsgtl0l6h-ats.iot.ap-southeast-2.amazonaws.com',8883)
     myClient.configureCredentials("AmazonRootCA1.pem","f088a7673ecd96e624c3e6e9b83de37442691e15ffbee24fd694ed966832dc94-private.pem.key","f088a7673ecd96e624c3e6e9b83de37442691e15ffbee24fd694ed966832dc94-certificate.pem.crt")
-    myClient.configureAutoReconnectBackoffTime(1, 32, 20)
-    myClient.configureOfflinePublishQueueing(-1)
-    myClient.configureDrainingFrequency(2)
     myClient.configureConnectDisconnectTimeout(10)
-    myClient.configureMQTTOperationTimeout(5)
+
     myClient.connect()
-    myClient.subscribe("test/comp6733", 0, callback)
+
+    myClient.subscribe("test/downstream", 1, callback)
+
     while True:
-        time.sleep(1)
+        time.sleep(5)
+        print("Processor Heartbeat")
