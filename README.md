@@ -1,5 +1,6 @@
 # COMP6733 Project - Blue Monkeys Team
-<em> Fire Monitoring Using WiFi CSI </em>
+<strong><em> Fire Monitoring Using WiFi CSI </em></strong>
+<strong>Authors:<em>Amy Willing, Jason Jeon, Ethan Marlow, Hayden Zhang</em></strong>
 
 
 This repo is for code used in the project and also any other important relevant docs etc.
