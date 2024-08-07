@@ -18,4 +18,4 @@ All training data is collected in the *dataCollection* folder as .pcap or .csv f
 The live temperature and fire prediction component consists of three modules:
 - **Live CSI Amplitude Collection:**
 - **Temperature Prediction using Linear Regression Model:**
-- **Fire Alarm:** The code for the fire alarm is contained in the **dataProcessing/fireAlarm.py** file which is executed on a Raspberry Pi 1B. This Python script retrieves MQTT packets that contain the predicted temperature and whether the fire alarm is activated or not. Using data from these MQTT packets, the fire alarm displays relevant data on the LCD screen and if the fire alarm is set also sets the buzzer to beep. 
+- **Fire Alarm:** The code for the fire alarm is contained in the ***dataProcessing/fireAlarm.py*** file which is executed on a Raspberry Pi 1B. This Python script retrieves MQTT packets that contain the predicted temperature and whether the fire alarm is activated or not. Using data from these MQTT packets, the fire alarm displays relevant data on the LCD screen and if the fire alarm is set also sets the buzzer to beep. 
