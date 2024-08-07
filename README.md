@@ -17,6 +17,6 @@ There are two core components of the project:
 
 ## Live Temperature & Fire Prediction
 The live temperature and fire prediction component consists of three modules:
-- **Live CSI Amplitude Collection:**
-- **Temperature Prediction using Linear Regression Model:**
-- **Fire Alarm:** The code for the fire alarm is contained in the ***dataProcessing/fireAlarm.py*** file which is executed on a Raspberry Pi 1B. This Python script retrieves MQTT packets that contain the predicted temperature and whether the fire alarm is activated or not. Using data from these MQTT packets, the fire alarm displays relevant data on the LCD screen and if the fire alarm is set also sets the buzzer to beep. 
+1. **Live CSI Amplitude Collection:** The code for retrieving live packets from Nexmon CSI and processing the packets to retrieve the current live CSI amplitude is located at ***dataProcessing/csiLiveData4.py***. This Python script is executed on a Raspberry Pi with Nexmon CSI installed and sends the live CSI amplitude over MQTT to Module 2 below.
+2. **Temperature Prediction using Linear Regression Model:** The Linear Regression model code is located in the ***dataProcessing/datap.py*** file. This script is run on a laptop due to processing power requirements and predicts the temperature based on the live CSI data from the Raspberry Pi and whether the fire alarm should be set and then notifies the fire alarm (Module 3 below) over MQTT. 
+3. **Fire Alarm:** The code for the fire alarm is contained in the ***dataProcessing/fireAlarm.py*** file which is executed on a Raspberry Pi 1B. This Python script retrieves MQTT packets that contain the predicted temperature and whether the fire alarm is activated or not. Using data from these MQTT packets, the fire alarm displays relevant data on the LCD screen and if the fire alarm is set also sets the buzzer to beep. 
