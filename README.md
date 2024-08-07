@@ -12,8 +12,8 @@ There are two core components of the project:
 - **Live Temperature & Fire Prediction:** Predicting the temperature based upon the current WiFi CSI amplitude and activating the fire alarm if the temperature is abnormally high.
 
 ## Training Data Collection
-- **CSI Data:** All training data is collected in the *dataCollection* folder as .pcap or .csv files with each row representing the individual packets received by the receiving Raspberry Pi using the Nexmon CSI library. In addition there is also some sample data in the *sampleData* folder.
-- **Temperature Data:** Temperature readings are stored in the *tempDetection* folder including the Python code used to obtain temperature readings from the Arduino Nano BLE device.
+- **CSI Data:** All training data is collected in the ***dataCollection*** folder as .pcap or .csv files with each row representing the individual packets received by the receiving Raspberry Pi using the Nexmon CSI library. In addition there is also some sample data in the ***sampleData*** folder.
+- **Temperature Data:** Temperature readings are stored in the ***tempDetection*** folder including the Python code used to obtain temperature readings from the Arduino Nano BLE device.
 
 ## Live Temperature & Fire Prediction
 The live temperature and fire prediction component consists of three modules:
