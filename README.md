@@ -1,6 +1,7 @@
 # COMP6733 Project - Blue Monkeys Team
 <strong><em> Fire Monitoring Using WiFi CSI </em></strong> <br>
 <strong>Authors: <em>Amy Willing, Jason Jeon, Ethan Marlow, Hayden Zhang</em></strong><br>
+<strong>Monday 5th August 2024</strong><br>
 
 ## Background
 In this project we aim to detect fires using WiFi Channel State Information (CSI). Recent literature suggests that for every increase of 1 degree Celcius in temperature, CSI amplitude as an average over all subcarriers reduces by 13. Using this inverse correlation we use a Linear Regression model to attempt to predict the temperature of a room using WiFi CSI and if the predicted temperature is abnormally high, a fire alarm will be activated.
