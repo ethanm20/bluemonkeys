@@ -1,5 +1,5 @@
 # COMP6733 Project - Blue Monkeys Team
-## Fire Monitoring Using WiFi CSI
+<em> Fire Monitoring Using WiFi CSI </em>
 
 
 This repo is for code used in the project and also any other important relevant docs etc.
