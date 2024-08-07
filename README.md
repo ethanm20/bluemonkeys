@@ -3,7 +3,7 @@ COMP6733 Project
 
 This repo is for code used in the project and also any other important relevant docs etc.
 
-There are 3 folders:
+There are 3 folders :
 
 *dataCollection: Code for the data collection stage when we are simply collecting the data that will be used in the model.
 
